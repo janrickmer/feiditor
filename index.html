@@ -115,6 +115,20 @@
     white-space:pre-wrap; word-wrap:break-word; overflow-wrap:anywhere;
   }
   .nmeta{font-family:var(--sans); font-size:12.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-bottom:14px}
+
+  /* Rote Felder (Escape-Room-Modus, identisch zum eingebetteten Feiditor) */
+  .moodle-hints{max-width:760px; margin:0 auto}
+  .moodle-hint{
+    max-width:760px; margin:14px auto 0; padding:14px 20px;
+    background:#fdecea; border:1.5px solid #f5b8b1; border-radius:8px;
+    color:#a72020; font-family:var(--sans); font-size:14.5px; font-weight:600;
+    text-align:center; line-height:1.5;
+    user-select:none;
+  }
+  /* Escape-Upload-Bereich auf der Anmeldeseite */
+  .esc-upload{margin-top:22px; padding-top:18px; border-top:1px solid var(--line)}
+  .esc-upload .sub{color:var(--muted); font-size:13.5px; margin:0 0 12px}
+  .esc-upload .drop{padding:18px}
 </style>
 </head>
 <body>
@@ -135,6 +149,16 @@
     </div>
     <p class="err" id="start-err"></p>
     <button class="btn block" id="start-btn">Schreibbereich öffnen</button>
+
+    <div class="esc-upload">
+      <p class="sub">Kommst du aus einem Escape-Room und hast den Feiditor-Link verloren? Lade hier deine <strong>Überblick-PDF</strong> hoch – der Feiditor öffnet sich dann mit deinen Aufgaben.</p>
+      <div class="drop" id="esc-drop">
+        <p style="margin:0 0 10px"><strong>Überblick-PDF auswählen</strong> oder hierher ziehen</p>
+        <input type="file" id="esc-input" accept="application/pdf,.pdf">
+      </div>
+      <p class="err" id="esc-err"></p>
+    </div>
+
     <div class="foot"><a href="#" id="to-teacher">Lehrkraft</a></div>
   </div>
 </section>
@@ -149,6 +173,7 @@
     <div class="sheet">
       <textarea id="editor" placeholder="Hier schreiben…" spellcheck="true" autocomplete="off"></textarea>
     </div>
+    <div class="moodle-hints" id="moodle-hints"></div>
   </div>
   <div class="actionbar">
     <button class="btn" id="export-btn">Text in PDF-Datei umwandeln</button>
@@ -160,8 +185,7 @@
   <div class="panel">
     <a href="#" class="backlink" id="back-start">← zurück</a>
     <h1>Auswertung für die Lehrkraft</h1>
-    <p class="sub">Im Normalfall genügt es, die mitgelieferte HTML-Datei (…_Auswertung.html) per Doppelklick zu öffnen und den Code einzugeben.
-       Dieser Bereich ist nur als Reserve gedacht: Falls einmal nur die PDF vorliegt, hier die PDF laden und den Code eingeben.</p>
+    <p class="sub">Laden Sie die PDF-Datei der Schülerin bzw. des Schülers und geben Sie den Code ein, um die Schreib-Auswertung anzuzeigen.</p>
 
     <div class="drop">
       <p style="margin:0 0 10px"><strong>PDF auswählen</strong> oder hierher ziehen</p>
@@ -237,7 +261,7 @@ function buildPdf(opts){
   const nPages=pages.length;
 
   // roter Moodle-Hinweis unten auf der letzten Seite
-  const noteText="Bitte die zugeh\u00f6rige Auswertungsdatei bei Moodle hochladen.";
+  const noteText="Bitte diese PDF-Datei herunterladen und bei Moodle hochladen.";
   const noteLines=wrapText(noteText,usableW,NOTE_SIZE);
   const noteBottom=46; // Grundlinie der untersten Hinweiszeile
 
@@ -290,7 +314,8 @@ async function aesEncrypt(plain,codeStr){const iv=crypto.getRandomValues(new Uin
 async function aesDecrypt(bundle,codeStr){const parts=bundle.split(":");const iv=b64ToBytes(parts[0]);const ct=b64ToBytes(parts[1]);const key=await _key(codeStr,["decrypt"]);const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv},key,ct);return new TextDecoder().decode(pt);}
 function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));}
 function classify(isVisible,src,gap){
-  const COL={plain:"#23201b",paste:"#b3261e",fast:"#c2710c",slow:"#1f7a34"};
+  const COL={plain:"#23201b",paste:"#b3261e",fast:"#c2710c",slow:"#1f7a34",system:"#9c948a"};
+  if(src==="s") return COL.system;           // System-Text (vorbefüllte Aufgaben) -> gedämpftes Grau
   if(!isVisible) return COL.plain;
   if(src==="p") return COL.paste;            // aus Zwischenablage -> rot
   if(gap>=0&&gap<=15) return COL.paste;      // <= 0,015 s getippt -> rot
@@ -305,7 +330,7 @@ function renderAnalysis(payload){
     const ch=t[i]; const isV=!WS.test(ch);
     const mark=m[i]||["t",-1]; const src=mark[0]; const gap=mark[1];
     const col=classify(isV,src,gap);
-    if(isV){ total++;
+    if(isV && src!=="s"){ total++;
       if(col==="#b3261e") red++;
       else if(col==="#c2710c") orange++;
       else green++;
@@ -428,6 +453,16 @@ function downloadBlob(blob,filename){
 }
 
 let studentVorname="", studentNachname="";
+let escapeRed=[];     // Texte der beiden roten Felder im Escape-Room-Modus
+
+function updateCharcount(){
+  let n=0; for(const r of recs){ if(r.src!=="s") n++; }
+  $("charcount").textContent=String(n);
+}
+function renderMoodleHints(){
+  const box=$("moodle-hints"); if(!box) return;
+  box.innerHTML=escapeRed.map(t=>`<div class="moodle-hint">${esc(t)}</div>`).join("");
+}
 
 /* Start */
 $("start-btn").addEventListener("click",()=>{
@@ -435,6 +470,7 @@ $("start-btn").addEventListener("click",()=>{
   if(!v||!n){$("start-err").textContent="Bitte Vor- und Nachnamen eintragen.";return;}
   studentVorname=v; studentNachname=n;
   $("who-name").textContent=v+" "+n;
+  escapeRed=[]; renderMoodleHints();          // normaler Modus: keine roten Felder
   prevValue=""; recs=[]; $("editor").value="";
   $("charcount").textContent="0";
   show("screen-editor");
@@ -445,6 +481,56 @@ $("nachname").addEventListener("keydown",e=>{if(e.key==="Enter")$("start-btn").c
 $("to-teacher").addEventListener("click",e=>{e.preventDefault();show("screen-teacher");});
 $("back-start").addEventListener("click",e=>{e.preventDefault();show("screen-start");});
 
+/* ---------- Escape-Room-Modus: aus hochgeladener Überblick-PDF rekonstruieren ---------- */
+function buildPrefill(tasks){
+  const lines=[];
+  tasks.forEach((task,i)=>{
+    lines.push("Aufgabe "+(i+1));
+    lines.push(task);
+    for(let k=0;k<8;k++) lines.push("");   // 8 Leerzeilen Lösungsraum
+  });
+  return lines.join("\n");
+}
+function startEscapeMode(v,n,tasks,red){
+  studentVorname=(v||"").trim(); studentNachname=(n||"").trim();
+  $("who-name").textContent=(studentVorname+" "+studentNachname).trim();
+  escapeRed=Array.isArray(red)?red:[];
+  const prefill=(Array.isArray(tasks)&&tasks.length)?buildPrefill(tasks):"";
+  const now=Date.now();
+  ed.value=prefill; prevValue=prefill;
+  recs=prefill.split("").map(()=>({src:"s",t:now}));   // vorbefüllter Text = System (grau, nicht gezählt)
+  renderMoodleHints();
+  updateCharcount();
+  show("screen-editor");
+  setTimeout(()=>{
+    ed.focus();
+    const firstGap=prefill.indexOf("\n\n");
+    const pos=firstGap>=0?firstGap+2:prefill.length;
+    try{ ed.setSelectionRange(pos,pos); }catch(e){}
+  },50);
+}
+function readEscapePdf(file){
+  $("esc-err").textContent="";
+  const fr=new FileReader();
+  fr.onload=()=>{
+    const bytes=new Uint8Array(fr.result);
+    let str=""; for(let i=0;i<bytes.length;i++) str+=String.fromCharCode(bytes[i]);
+    const mm=str.match(/%ESCAPEDATA (\S+)/);
+    if(!mm){$("esc-err").textContent="In dieser PDF wurden keine Escape-Room-Daten gefunden. Bitte lade die Überblick-PDF aus dem Escape-Room hoch.";return;}
+    let d;
+    try{ d=JSON.parse(decodeURIComponent(escape(atob(mm[1])))); }
+    catch(e){ $("esc-err").textContent="Die Escape-Room-Daten konnten nicht gelesen werden."; return; }
+    startEscapeMode(d.v,d.n,d.t,d.r);
+  };
+  fr.onerror=()=>{$("esc-err").textContent="Datei konnte nicht gelesen werden.";};
+  fr.readAsArrayBuffer(file);
+}
+$("esc-input").addEventListener("change",e=>{const f=e.target.files[0];if(f)readEscapePdf(f);});
+const escDrop=$("esc-drop");
+["dragover","dragenter"].forEach(ev=>escDrop.addEventListener(ev,e=>{e.preventDefault();escDrop.style.borderColor="#8a6a3c";}));
+["dragleave","drop"].forEach(ev=>escDrop.addEventListener(ev,e=>{e.preventDefault();escDrop.style.borderColor="";}));
+escDrop.addEventListener("drop",e=>{const f=e.dataTransfer.files[0];if(f)readEscapePdf(f);});
+
 /* Editor-Tracking */
 const ed=$("editor");
 ed.addEventListener("paste",()=>{justPasted=true;});
@@ -452,22 +538,21 @@ ed.addEventListener("drop",()=>{justPasted=true;});
 ed.addEventListener("input",()=>{
   reconcile(ed.value,justPasted,Date.now());
   justPasted=false;
-  $("charcount").textContent=String(ed.value.length);
+  updateCharcount();
 });
 
-/* Export: erzeugt die Text-PDF (ohne Link, mit rotem Moodle-Hinweis) UND die code-geschützte HTML-Auswertung */
+/* Export: erzeugt NUR die Text-PDF (mit rotem Moodle-Hinweis); die Tracking-Daten stecken
+   verschlüsselt als %TRACKDATA in der PDF und sind über „Lehrkraft → PDF laden + Code" auslesbar */
 $("export-btn").addEventListener("click",async()=>{
   const btn=$("export-btn"); const text=ed.value;
   const name=studentVorname+" "+studentNachname;
-  btn.disabled=true; const old=btn.textContent; btn.textContent="Erzeuge Dateien…";
+  btn.disabled=true; const old=btn.textContent; btn.textContent="Erzeuge PDF…";
   try{
     const payload=buildPayload(name,text);
     const code=_kf(studentVorname);
     const bundle=await aesEncrypt(JSON.stringify(payload),code);
-    const teacherHtml=buildTeacherHtml(bundle);
 
     const pdfName=fileSafe("Text von "+studentVorname)+".pdf";
-    const htmlName=fileSafe("Auswertungsdatei zum Text von "+studentVorname+" "+studentNachname)+".html";
 
     // PDF: nur Text + roter Moodle-Hinweis; Tracking-Daten stecken (verschlüsselt) als %TRACKDATA-Reserve drin
     const pdfStr=buildPdf({name,body:text,trackB64:bundle});
@@ -475,11 +560,10 @@ $("export-btn").addEventListener("click",async()=>{
     for(let i=0;i<pdfStr.length;i++)u8[i]=pdfStr.charCodeAt(i)&0xFF;
 
     downloadBlob(new Blob([u8],{type:"application/pdf"}), pdfName);
-    setTimeout(()=>downloadBlob(new Blob([teacherHtml],{type:"text/html;charset=utf-8"}), htmlName), 250);
 
-    btn.textContent="PDF + Auswertung erstellt ✓";
+    btn.textContent="PDF erstellt ✓";
     setTimeout(()=>{ btn.textContent=old; }, 2200);
-  }catch(err){ alert("Fehler beim Erzeugen der Dateien: "+err.message); btn.textContent=old; }
+  }catch(err){ alert("Fehler beim Erzeugen der PDF: "+err.message); btn.textContent=old; }
   finally{ btn.disabled=false; }
 });
 
