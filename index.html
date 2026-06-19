@@ -70,10 +70,33 @@
     border-radius:6px; box-shadow:0 24px 60px -40px var(--shadow); padding:56px 60px;
   }
   #editor{
-    width:100%; min-height:60vh; resize:none; border:0; outline:0; background:transparent;
+    width:100%; min-height:60vh; border:0; outline:0; background:transparent;
     font-family:var(--serif); font-size:18.5px; line-height:1.78; color:var(--ink);
+    white-space:pre-wrap; word-wrap:break-word; overflow-wrap:anywhere;
   }
-  #editor::placeholder{color:#b9b0a0}
+  #editor:focus{outline:0}
+  #editor .heading{font-weight:700; font-size:2em; line-height:1.25; margin:.1em 0}
+  #editor.empty::before{content:attr(data-placeholder); color:#b9b0a0; pointer-events:none}
+
+  /* ---------- Formatierungsleiste (Word-artig) ---------- */
+  .formatbar{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    padding:9px 22px; border-bottom:1px solid var(--line); background:var(--paper2);
+  }
+  .fbtn{
+    font-family:var(--sans); font-size:15px; min-width:38px; height:34px; padding:0 11px;
+    color:var(--ink); background:var(--paper); border:1px solid var(--line); border-radius:8px;
+    cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+    transition:background .12s, border-color .12s, color .12s; user-select:none;
+  }
+  .fbtn:hover{background:#efe9dd}
+  .fbtn:active{transform:translateY(1px)}
+  .fbtn.active{background:var(--accent); color:var(--paper2); border-color:var(--accent)}
+  .fbtn.wide{font-size:13.5px; letter-spacing:.02em}
+  .fbtn .b{font-weight:800}
+  .fbtn .i{font-style:italic}
+  .fbtn .u{text-decoration:underline}
+  .fsep{width:1px; height:22px; background:var(--line); margin:0 3px}
   .actionbar{
     position:fixed; left:0; right:0; bottom:0; display:flex; justify-content:center;
     padding:16px 16px 46px; background:linear-gradient(to top, var(--paper) 60%, rgba(247,244,236,0));
@@ -169,9 +192,16 @@
     <div class="who"><span class="lbl">Verfasser:in</span><span id="who-name"></span></div>
     <div class="count"><span id="charcount">0</span> Zeichen</div>
   </div>
+  <div class="formatbar" id="formatbar">
+    <button type="button" class="fbtn" id="fb-bold" title="Fett (Strg+B)" aria-label="Fett"><span class="b">F</span></button>
+    <button type="button" class="fbtn" id="fb-italic" title="Kursiv (Strg+I)" aria-label="Kursiv"><span class="i">K</span></button>
+    <button type="button" class="fbtn" id="fb-underline" title="Unterstrichen (Strg+U)" aria-label="Unterstrichen"><span class="u">U</span></button>
+    <span class="fsep"></span>
+    <button type="button" class="fbtn wide" id="fb-heading" title="Überschrift (fett, doppelte Größe)">Überschrift</button>
+  </div>
   <div class="paperwrap">
     <div class="sheet">
-      <textarea id="editor" placeholder="Hier schreiben…" spellcheck="true" autocomplete="off"></textarea>
+      <div id="editor" contenteditable="true" spellcheck="true" data-placeholder="Hier schreiben…"></div>
     </div>
     <div class="moodle-hints" id="moodle-hints"></div>
   </div>
@@ -215,83 +245,139 @@
 /* ---------- Helvetica-Glyphbreiten (AFM, Einheiten/1000), nach Byte ---------- */
 const HELV={32:278,33:278,34:355,35:556,36:556,37:889,38:667,39:191,40:333,41:333,42:389,43:584,44:278,45:333,46:278,47:278,48:556,49:556,50:556,51:556,52:556,53:556,54:556,55:556,56:556,57:556,58:278,59:278,60:584,61:584,62:584,63:556,64:1015,65:667,66:667,67:722,68:722,69:667,70:611,71:778,72:722,73:278,74:500,75:667,76:556,77:833,78:722,79:778,80:667,81:778,82:722,83:667,84:611,85:722,86:667,87:944,88:667,89:667,90:611,91:278,92:278,93:278,94:469,95:556,96:333,97:556,98:556,99:500,100:556,101:556,102:278,103:556,104:556,105:222,106:222,107:500,108:222,109:833,110:556,111:556,112:556,113:556,114:333,115:500,116:278,117:556,118:500,119:722,120:500,121:500,122:500,123:334,124:260,125:334,126:584,133:1000,145:222,146:222,147:333,148:333,149:350,150:556,151:1000,160:278,161:333,162:556,163:556,164:556,165:556,166:260,167:556,168:333,169:737,170:370,171:556,172:584,173:333,174:737,175:333,176:400,177:584,178:333,179:333,180:333,181:556,182:537,183:278,184:333,185:333,186:365,187:556,188:834,189:834,190:834,191:611,192:667,193:667,194:667,195:667,196:667,197:667,198:1000,199:722,200:667,201:667,202:667,203:667,204:278,205:278,206:278,207:278,208:722,209:722,210:778,211:778,212:778,213:778,214:778,215:584,216:778,217:722,218:722,219:722,220:722,221:667,222:667,223:611,224:556,225:556,226:556,227:556,228:556,229:556,230:889,231:500,232:556,233:556,234:556,235:556,236:278,237:278,238:278,239:278,240:556,241:556,242:556,243:556,244:556,245:556,246:556,247:584,248:611,249:556,250:556,251:556,252:556,253:500,254:556,255:500};
 function afm(b){return HELV[b]!==undefined?HELV[b]:556;}
+/* ---------- Helvetica-Bold-Glyphbreiten (AFM). ASCII exakt; Latin-1-Akzente von Basisbuchstaben ---------- */
+const HELVB={32:278,33:333,34:474,35:556,36:556,37:889,38:722,39:238,40:333,41:333,42:389,43:584,44:278,45:333,46:278,47:278,48:556,49:556,50:556,51:556,52:556,53:556,54:556,55:556,56:556,57:556,58:333,59:333,60:584,61:584,62:584,63:611,64:975,65:722,66:722,67:722,68:722,69:667,70:611,71:778,72:722,73:278,74:556,75:722,76:611,77:833,78:722,79:778,80:667,81:778,82:722,83:667,84:611,85:722,86:667,87:944,88:667,89:667,90:611,91:333,92:278,93:333,94:584,95:556,96:333,97:556,98:611,99:556,100:611,101:556,102:333,103:611,104:611,105:278,106:278,107:556,108:278,109:889,110:611,111:611,112:611,113:611,114:389,115:556,116:333,117:611,118:556,119:778,120:556,121:556,122:500,123:389,124:280,125:389,126:584,192:722,193:722,194:722,195:722,196:722,197:722,198:1000,199:722,200:667,201:667,202:667,203:667,204:278,205:278,206:278,207:278,208:722,209:722,210:778,211:778,212:778,213:778,214:778,215:584,216:778,217:722,218:722,219:722,220:722,221:667,222:667,223:611,224:556,225:556,226:556,227:556,228:556,229:556,230:889,231:556,232:556,233:556,234:556,235:556,236:278,237:278,238:278,239:278,240:611,241:611,242:611,243:611,244:611,245:611,246:611,247:584,248:611,249:611,250:611,251:611,252:611,253:556,254:611,255:556};
+function afmW(b,bold){const T=bold?HELVB:HELV;return T[b]!==undefined?T[b]:(HELV[b]!==undefined?HELV[b]:556);}
+function chW(ch,bold,s){return afmW(charByte(ch),bold)/1000*s;}
+function runWidth(str,bold,s){let w=0;for(const ch of str)w+=chW(ch,bold,s);return w;}
+function fontFor(b,i){if(b&&i)return"F4";if(b)return"F2";if(i)return"F3";return"F1";}
 const CP1252={0x20AC:128,0x201A:130,0x0192:131,0x201E:132,0x2026:133,0x2020:134,0x2021:135,0x02C6:136,0x2030:137,0x0160:138,0x2039:139,0x0152:140,0x017D:142,0x2018:145,0x2019:146,0x201C:147,0x201D:148,0x2022:149,0x2013:150,0x2014:151,0x02DC:152,0x2122:153,0x0161:154,0x203A:155,0x0153:156,0x017E:158,0x0178:159};
 function charByte(ch){const cp=ch.codePointAt(0);if(cp<=0xFF)return cp;if(CP1252[cp]!==undefined)return CP1252[cp];return 0x3F;}
 function charWidth(ch,s){return afm(charByte(ch))/1000*s;}
 function textWidth(str,s){let w=0;for(const ch of str)w+=charWidth(ch,s);return w;}
 function encStr(str){let o="";for(const ch of str){const b=charByte(ch);if(b===0x28)o+="\\(";else if(b===0x29)o+="\\)";else if(b===0x5C)o+="\\\\";else o+=String.fromCharCode(b);}return o;}
 
-function wrapText(text,maxW,size){
-  const lines=[]; const paras=text.replace(/\r\n?/g,"\n").split("\n");
-  for(const para of paras){
-    if(para===""){lines.push("");continue;}
-    const words=para.split(/( )/); let cur="";
-    const pushWord=(w)=>{
-      if(textWidth(w,size)>maxW){
-        let chunk="";
-        for(const ch of w){
-          if(textWidth(chunk+ch,size)>maxW&&chunk!==""){
-            if(cur!==""){lines.push(cur);cur="";} lines.push(chunk); chunk=ch;
-          } else chunk+=ch;
-        }
-        if(chunk){if(cur!==""){lines.push(cur);cur="";} cur=chunk;} return;
-      }
-      if(textWidth(cur+w,size)>maxW&&cur!==""){lines.push(cur.replace(/ +$/,""));cur=w.trim()===""?"":w;}
-      else cur+=w;
-    };
-    for(const w of words) pushWord(w);
-    lines.push(cur.replace(/ +$/,""));
+/* Absatz (Array {ch,b,i,u,h}, einheitliche Größe) -> Anzeigezeilen (jede = Array von {ch,b,i,u}) */
+function wrapPara(chars,size,maxW){
+  const lines=[]; let cur=[]; let curW=0; let lastSpace=-1;
+  for(const c of chars){
+    const w=chW(c.ch,c.b,size);
+    if(curW+w>maxW && cur.length>0){
+      if(lastSpace>=0){
+        const head=cur.slice(0,lastSpace);
+        const tail=cur.slice(lastSpace+1);
+        lines.push(head);
+        cur=tail; curW=0; for(const x of cur)curW+=chW(x.ch,x.b,size);
+        lastSpace=-1; for(let k=cur.length-1;k>=0;k--){if(cur[k].ch===" "){lastSpace=k;break;}}
+      } else { lines.push(cur); cur=[]; curW=0; lastSpace=-1; }
+    }
+    cur.push(c); curW+=w;
+    if(c.ch===" ") lastSpace=cur.length-1;
   }
-  return lines;
+  lines.push(cur);
+  return lines.length?lines:[[]];
+}
+function lineToRuns(lineChars){
+  const runs=[];
+  for(const c of lineChars){
+    const last=runs[runs.length-1];
+    if(last && last.b===c.b && last.i===c.i && last.u===c.u) last.text+=c.ch;
+    else runs.push({text:c.ch,b:c.b,i:c.i,u:c.u});
+  }
+  return runs;
 }
 
 function buildPdf(opts){
   const PW=595.28,PH=841.89, ML=56,MR=56,MT=56,MB=64;
-  const HEAD_SIZE=13,BODY_SIZE=11,NOTE_SIZE=11,LEAD=15.5;
+  const HEAD_SIZE=13, BODY_SIZE=11, HEAD2_SIZE=22, NOTE_SIZE=11;
+  const BODY_LEAD=15.5, HEAD_LEAD=28;
   const usableW=PW-ML-MR;
   const headerBaseline=PH-MT-HEAD_SIZE, ruleY=headerBaseline-6, bodyTop=ruleY-22, bodyBottom=MB+24;
-  const allLines=wrapText(opts.body||"",usableW,BODY_SIZE);
-  if(allLines.length===0) allLines.push("");
+
+  const text=opts.text||""; const fmt=opts.fmt||[];
+  // in Absätze an '\n' teilen
+  const paras=[]; { let cur=[]; for(let i=0;i<text.length;i++){ const ch=text[i]; if(ch==="\n"){paras.push(cur);cur=[];} else { const ft=fmt[i]||{}; cur.push({ch,b:!!ft.b,i:!!ft.i,u:!!ft.u,h:!!ft.h}); } } paras.push(cur); }
+
+  // Anzeigezeilen mit Größe/Durchschuss
+  const dispLines=[];
+  for(const para of paras){
+    const heading=para.length?para[0].h:false;
+    const size=heading?HEAD2_SIZE:BODY_SIZE;
+    const lead=heading?HEAD_LEAD:BODY_LEAD;
+    if(para.length===0){ dispLines.push({runs:[],size:BODY_SIZE,lead:BODY_LEAD}); continue; }
+    const wrapped=wrapPara(para,size,usableW);
+    for(const wl of wrapped) dispLines.push({runs:lineToRuns(wl),size,lead});
+  }
+  if(dispLines.length===0) dispLines.push({runs:[],size:BODY_SIZE,lead:BODY_LEAD});
+
+  // Seiten füllen
   const pages=[]; let idx=0;
-  while(idx<allLines.length){
+  while(idx<dispLines.length){
     const pageLines=[]; let y=bodyTop;
-    while(idx<allLines.length&&y>=bodyBottom){pageLines.push({text:allLines[idx],y});y-=LEAD;idx++;}
+    while(idx<dispLines.length && y>=bodyBottom){ const dl=dispLines[idx]; pageLines.push({dl,y}); y-=dl.lead; idx++; }
+    if(pageLines.length===0){ pageLines.push({dl:dispLines[idx],y:bodyTop}); idx++; }
     pages.push({lines:pageLines});
   }
   const nPages=pages.length;
 
-  // roter Moodle-Hinweis unten auf der letzten Seite
   const noteText="Bitte diese PDF-Datei herunterladen und bei Moodle hochladen.";
-  const noteLines=wrapText(noteText,usableW,NOTE_SIZE);
-  const noteBottom=46; // Grundlinie der untersten Hinweiszeile
+  const noteLines=[]; { // Hinweis ist immer normal/unformatiert
+    const arr=noteText.split("").map(ch=>({ch,b:false,i:false,u:false}));
+    for(const wl of wrapPara(arr,NOTE_SIZE,usableW)) noteLines.push(lineToRuns(wl));
+  }
+  const noteBottom=46;
 
-  const pageObjNum=(i)=>4+i*2, contObjNum=(i)=>5+i*2;
+  const pageObjNum=(i)=>7+i*2, contObjNum=(i)=>8+i*2;
   const objects={};
   objects[1]="<< /Type /Catalog /Pages 2 0 R >>";
   objects[2]=`<< /Type /Pages /Count ${nPages} /Kids [${pages.map((_,i)=>`${pageObjNum(i)} 0 R`).join(" ")}] >>`;
   objects[3]="<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>";
+  objects[4]="<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>";
+  objects[5]="<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding >>";
+  objects[6]="<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-BoldOblique /Encoding /WinAnsiEncoding >>";
+
   for(let i=0;i<nPages;i++){
-    objects[pageObjNum(i)]=`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW.toFixed(2)} ${PH.toFixed(2)}] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contObjNum(i)} 0 R >>`;
+    objects[pageObjNum(i)]=`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW.toFixed(2)} ${PH.toFixed(2)}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >> >> /Contents ${contObjNum(i)} 0 R >>`;
     let s="0.5 w\n";
+    // Name + Linie
     s+=`BT /F1 ${HEAD_SIZE} Tf 0 0 0 rg ${ML} ${headerBaseline.toFixed(2)} Td (${encStr(opts.name||"")}) Tj ET\n`;
     s+=`${ML} ${ruleY.toFixed(2)} m ${(PW-MR).toFixed(2)} ${ruleY.toFixed(2)} l S\n`;
-    const pl=pages[i].lines;
-    if(pl.length){
-      s+=`BT /F1 ${BODY_SIZE} Tf 0 0 0 rg ${ML} ${pl[0].y.toFixed(2)} Td ${LEAD} TL\n`;
-      for(let j=0;j<pl.length;j++){if(j>0)s+="T*\n"; s+=`(${encStr(pl[j].text)}) Tj\n`;}
-      s+="ET\n";
+    // Textzeilen
+    const underlines=[];
+    for(const pl of pages[i].lines){
+      const dl=pl.dl, y=pl.y;
+      if(dl.runs.length){
+        s+=`BT 1 0 0 1 ${ML.toFixed(2)} ${y.toFixed(2)} Tm 0 0 0 rg\n`;
+        let x=ML;
+        for(const run of dl.runs){
+          const fn=fontFor(run.b,run.i);
+          s+=`/${fn} ${dl.size} Tf (${encStr(run.text)}) Tj\n`;
+          const rw=runWidth(run.text,run.b,dl.size);
+          if(run.u){ underlines.push({x1:x,x2:x+rw,y:y-dl.size*0.12,lw:Math.max(0.5,dl.size*0.06)}); }
+          x+=rw;
+        }
+        s+="ET\n";
+      }
     }
-    if(i===nPages-1){ // roter Hinweis nur auf der letzten Seite
-      const topY=noteBottom+(noteLines.length-1)*LEAD;
-      s+=`BT /F1 ${NOTE_SIZE} Tf 0.78 0.05 0.05 rg ${ML} ${topY.toFixed(2)} Td ${LEAD} TL\n`;
-      for(let j=0;j<noteLines.length;j++){if(j>0)s+="T*\n"; s+=`(${encStr(noteLines[j])}) Tj\n`;}
-      s+="ET\n";
+    for(const ul of underlines){
+      s+=`${ul.lw.toFixed(2)} w 0 0 0 RG ${ul.x1.toFixed(2)} ${ul.y.toFixed(2)} m ${ul.x2.toFixed(2)} ${ul.y.toFixed(2)} l S\n`;
+    }
+    // roter Hinweis nur auf der letzten Seite
+    if(i===nPages-1){
+      let yy=noteBottom+(noteLines.length-1)*BODY_LEAD;
+      for(const runs of noteLines){
+        s+=`BT 1 0 0 1 ${ML.toFixed(2)} ${yy.toFixed(2)} Tm 0.78 0.05 0.05 rg\n`;
+        for(const run of runs){ s+=`/F1 ${NOTE_SIZE} Tf (${encStr(run.text)}) Tj\n`; }
+        s+="ET\n";
+        yy-=BODY_LEAD;
+      }
     }
     objects[contObjNum(i)]={stream:s};
   }
+
   let pdf="%PDF-1.7\n%\u00E2\u00E3\u00CF\u00D3\n";
   if(opts.trackB64) pdf+=`%TRACKDATA ${opts.trackB64}\n`;
-  const offsets={}; const maxNum=3+nPages*2;
+  const offsets={}; const maxNum=6+nPages*2;
   for(let n=1;n<=maxNum;n++){
     offsets[n]=pdf.length; const o=objects[n];
     if(o&&o.stream!==undefined){const st=o.stream;pdf+=`${n} 0 obj\n<< /Length ${st.length} >>\nstream\n${st}endstream\nendobj\n`;}
@@ -323,7 +409,7 @@ function classify(isVisible,src,gap){
   return COL.slow;                           // > 0,07 s / erstes Zeichen -> grün
 }
 function renderAnalysis(payload){
-  const t=payload.t, m=payload.m||[];
+  const t=payload.t, m=payload.m||[], f=payload.f||[];
   let html=""; let total=0,red=0,orange=0,green=0;
   const WS=/\s/;
   for(let i=0;i<t.length;i++){
@@ -335,7 +421,11 @@ function renderAnalysis(payload){
       else if(col==="#c2710c") orange++;
       else green++;
     }
-    html+=`<span style="color:${col}">${esc(ch)}</span>`;
+    const fl=f[i]||0; let st="color:"+col;
+    if(fl&8){ st+=";font-weight:700;font-size:1.6em"; } else if(fl&1){ st+=";font-weight:700"; }
+    if(fl&2) st+=";font-style:italic";
+    if(fl&4) st+=";text-decoration:underline";
+    html+=`<span style="${st}">${esc(ch)}</span>`;
   }
   const pct=(x)=>total?Math.round(x/total*100):0;
   const legend=
@@ -416,16 +506,20 @@ function reconcile(newVal,pasted,now){
   prevValue=newVal;
 }
 
-function buildPayload(name,text){
+function buildPayload(name,text,fmt){
   if(recs.length!==text.length){ // letzte Absicherung
     const now=Date.now(); recs=text.split("").map(()=>({src:"t",t:now}));
   }
-  const m=[];
+  fmt=fmt||[];
+  const m=[]; const f=[];
   for(let i=0;i<text.length;i++){
     const gap=(i===0)?-1:(recs[i].t-recs[i-1].t);
     m.push([recs[i].src,gap]);
+    const ft=fmt[i]||{};
+    let bits=0; if(ft.b)bits|=1; if(ft.i)bits|=2; if(ft.u)bits|=4; if(ft.h)bits|=8;
+    f.push(bits);
   }
-  return {n:name,t:text,m};
+  return {n:name,t:text,m,f};
 }
 
 /* ------------------------------ UI-Steuerung ------------------------------ */
@@ -471,7 +565,7 @@ $("start-btn").addEventListener("click",()=>{
   studentVorname=v; studentNachname=n;
   $("who-name").textContent=v+" "+n;
   escapeRed=[]; renderMoodleHints();          // normaler Modus: keine roten Felder
-  prevValue=""; recs=[]; $("editor").value="";
+  prevValue=""; recs=[]; setEditorText("");
   $("charcount").textContent="0";
   show("screen-editor");
   setTimeout(()=>$("editor").focus(),40);
@@ -497,16 +591,18 @@ function startEscapeMode(v,n,tasks,red){
   escapeRed=Array.isArray(red)?red:[];
   const prefill=(Array.isArray(tasks)&&tasks.length)?buildPrefill(tasks):"";
   const now=Date.now();
-  ed.value=prefill; prevValue=prefill;
+  setEditorText(prefill); prevValue=prefill;
   recs=prefill.split("").map(()=>({src:"s",t:now}));   // vorbefüllter Text = System (grau, nicht gezählt)
   renderMoodleHints();
   updateCharcount();
   show("screen-editor");
   setTimeout(()=>{
     ed.focus();
-    const firstGap=prefill.indexOf("\n\n");
-    const pos=firstGap>=0?firstGap+2:prefill.length;
-    try{ ed.setSelectionRange(pos,pos); }catch(e){}
+    // Cursor in die erste leere Lösungszeile setzen
+    const pf=prefill.split("\n");
+    let bi=pf.indexOf(""); if(bi<0) bi=pf.length-1;
+    const blocks=Array.prototype.filter.call(ed.childNodes,n=>n.nodeType===1);
+    placeCaretAtBlockStart(blocks[bi]||blocks[blocks.length-1]);
   },50);
 }
 function readEscapePdf(file){
@@ -531,31 +627,192 @@ const escDrop=$("esc-drop");
 ["dragleave","drop"].forEach(ev=>escDrop.addEventListener(ev,e=>{e.preventDefault();escDrop.style.borderColor="";}));
 escDrop.addEventListener("drop",e=>{const f=e.dataTransfer.files[0];if(f)readEscapePdf(f);});
 
+/* ---------- Rich-Text-Editor: Serialisierung & Formatierung ---------- */
+/* Read-only: liest den contenteditable-Inhalt als {text, fmt} aus, OHNE das DOM
+   oder den Cursor zu verändern. Inline-Formatierung ändert den Text nicht, nur fmt –
+   dadurch bleiben die Tipp-Tempo-Daten (recs) über Formatierungen hinweg erhalten. */
+function serializeEditor(){
+  const root=$("editor");
+  const chars=[]; const fmt=[];
+  function isBlock(node){ return node.nodeType===1 && /^(DIV|P|H[1-6]|LI|BLOCKQUOTE|PRE)$/.test(node.tagName); }
+  function lastIsNL(){ return chars.length===0 || chars[chars.length-1]==="\n"; }
+  function pushCh(ch,st){ chars.push(ch); fmt.push({b:st.b,i:st.i,u:st.u,h:st.h}); }
+  function lastChildOfBlock(node){
+    const p=node.parentNode; return p && isBlock(p) && p.childNodes[p.childNodes.length-1]===node;
+  }
+  function walk(node, st){
+    const kids=node.childNodes||[];
+    for(let k=0;k<kids.length;k++){
+      const child=kids[k];
+      if(child.nodeType===3){
+        const s=child.nodeValue||"";
+        for(const ch of s) pushCh(ch, st);
+      } else if(child.nodeType===1){
+        const tag=child.tagName;
+        if(tag==="BR"){
+          if(lastChildOfBlock(child)){ /* Platzhalter-<br> -> kein Umbruch */ }
+          else pushCh("\n", st);
+          continue;
+        }
+        const ns={b:st.b,i:st.i,u:st.u,h:st.h};
+        if(tag==="B"||tag==="STRONG") ns.b=true;
+        if(tag==="I"||tag==="EM") ns.i=true;
+        if(tag==="U"||tag==="INS") ns.u=true;
+        const sty=child.style||{};
+        const fw=sty.fontWeight; if(fw==="bold"||fw==="bolder"||(fw&&parseInt(fw,10)>=600)) ns.b=true;
+        const fst=sty.fontStyle; if(fst&&String(fst).indexOf("italic")>=0) ns.i=true;
+        const td=(sty.textDecorationLine||sty.textDecoration||""); if(String(td).indexOf("underline")>=0) ns.u=true;
+        if(child.classList&&child.classList.contains("heading")){ ns.h=true; ns.b=true; }
+        if(/^H[1-6]$/.test(tag)){ ns.h=true; ns.b=true; }
+        try{ const cs=getComputedStyle(child); if(cs){ const w=cs.fontWeight; if(w==="bold"||w==="bolder"||(parseInt(w,10)>=600)) ns.b=true; if(String(cs.fontStyle||"").indexOf("italic")>=0) ns.i=true; } }catch(e){}
+        if(isBlock(child) && !lastIsNL()) pushCh("\n", st);
+        walk(child, ns);
+      }
+    }
+  }
+  walk(root, {b:false,i:false,u:false,h:false});
+  return { text: chars.join(""), fmt };
+}
+
+/* Baut den Editor-Inhalt aus reinem Text neu auf (jede Zeile = ein Block-DIV). */
+function setEditorText(plain){
+  const root=$("editor"); root.innerHTML="";
+  const lines=String(plain||"").split("\n");
+  for(const line of lines){
+    const div=document.createElement("div");
+    if(line==="") div.appendChild(document.createElement("br"));
+    else div.appendChild(document.createTextNode(line));
+    root.appendChild(div);
+  }
+  if(root.childNodes.length===0){ const d=document.createElement("div"); d.appendChild(document.createElement("br")); root.appendChild(d); }
+  updateEmpty();
+}
+
+/* Platzhalter ein-/ausblenden (CSS: #editor.empty::before) */
+function updateEmpty(){
+  const root=$("editor");
+  root.classList.toggle("empty", serializeEditor().text.length===0);
+}
+
+/* Den Block (oberste DIV-Ebene im Editor), in dem ein Knoten liegt. */
+function blockOf(node){
+  const root=$("editor"); if(!node) return null;
+  if(node===root){ return null; }
+  let n=node;
+  while(n && n.parentNode!==root) n=n.parentNode;
+  return (n && n.parentNode===root && n.nodeType===1) ? n : null;
+}
+/* Alle Blöcke, die von der aktuellen Auswahl berührt werden. */
+function selectedBlocks(){
+  const root=$("editor"); const sel=window.getSelection();
+  if(!sel||sel.rangeCount===0) return [];
+  const r=sel.getRangeAt(0);
+  let a=blockOf(r.startContainer), b=blockOf(r.endContainer);
+  const blocks=Array.prototype.filter.call(root.childNodes,n=>n.nodeType===1);
+  if(!a) a=blocks[0]; if(!b) b=blocks[blocks.length-1];
+  if(!a||!b) return [];
+  const ia=blocks.indexOf(a), ib=blocks.indexOf(b);
+  if(ia<0||ib<0) return [];
+  const lo=Math.min(ia,ib), hi=Math.max(ia,ib);
+  return blocks.slice(lo,hi+1);
+}
+/* Überschrift für die ausgewählten Blöcke umschalten. */
+function toggleHeading(){
+  const blocks=selectedBlocks(); if(!blocks.length) return;
+  const allHead=blocks.every(b=>b.classList.contains("heading"));
+  blocks.forEach(b=>{ if(allHead) b.classList.remove("heading"); else b.classList.add("heading"); });
+  $("editor").focus();
+  updateFormatButtons();
+}
+/* Button-Zustände an die aktuelle Auswahl/Cursorposition anpassen. */
+function updateFormatButtons(){
+  const q=(c)=>{ try{ return document.queryCommandState(c); }catch(e){ return false; } };
+  $("fb-bold").classList.toggle("active", q("bold"));
+  $("fb-italic").classList.toggle("active", q("italic"));
+  $("fb-underline").classList.toggle("active", q("underline"));
+  const blocks=selectedBlocks();
+  const head = blocks.length>0 && blocks.every(b=>b.classList.contains("heading"));
+  $("fb-heading").classList.toggle("active", head);
+}
+/* Inline-Befehl (bold/italic/underline) ausführen; Auswahl bleibt erhalten. */
+function execInline(cmd){
+  $("editor").focus();
+  try{ document.execCommand(cmd,false,null); }catch(e){}
+  updateFormatButtons();
+  updateEmpty();
+}
+/* Cursor an den Anfang eines Blocks setzen. */
+function placeCaretAtBlockStart(block){
+  if(!block) return;
+  const sel=window.getSelection(); const r=document.createRange();
+  r.setStart(block,0); r.collapse(true);
+  sel.removeAllRanges(); sel.addRange(r);
+}
+
 /* Editor-Tracking */
 const ed=$("editor");
-ed.addEventListener("paste",()=>{justPasted=true;});
+ed.addEventListener("paste",(e)=>{
+  // Nur reinen Text einfügen, damit das DOM sauber bleibt (keine fremde Formatierung)
+  if(e.clipboardData){
+    e.preventDefault();
+    const txt=e.clipboardData.getData("text/plain");
+    justPasted=true;
+    try{ document.execCommand("insertText",false,txt); }
+    catch(err){ justPasted=true; }
+  } else { justPasted=true; }
+});
 ed.addEventListener("drop",()=>{justPasted=true;});
+ed.addEventListener("keydown",(e)=>{
+  // Strg/Cmd+B/I/U: Browser formatiert selbst; danach Button-Status aktualisieren
+  if((e.ctrlKey||e.metaKey)&&!e.altKey){
+    const k=e.key.toLowerCase();
+    if(k==="b"||k==="i"||k==="u"){ setTimeout(()=>{ updateFormatButtons(); updateEmpty(); },0); }
+  }
+  // Enter in einer Überschrift: neue Zeile soll normal sein
+  if(e.key==="Enter"){
+    setTimeout(()=>{
+      const blocks=selectedBlocks();
+      blocks.forEach(b=>{ const txt=(b.textContent||"").replace(/\u200B/g,""); if(b.classList.contains("heading")&&txt==="") b.classList.remove("heading"); });
+      updateFormatButtons();
+    },0);
+  }
+});
 ed.addEventListener("input",()=>{
-  reconcile(ed.value,justPasted,Date.now());
+  reconcile(serializeEditor().text,justPasted,Date.now());
   justPasted=false;
   updateCharcount();
+  updateEmpty();
 });
+ed.addEventListener("keyup",updateFormatButtons);
+ed.addEventListener("mouseup",updateFormatButtons);
+document.addEventListener("selectionchange",()=>{ if(document.activeElement===$("editor")) updateFormatButtons(); });
+
+/* Formatierungsleiste verdrahten – mousedown + preventDefault, damit die Auswahl erhalten bleibt */
+function wireFmtBtn(id,fn){
+  const b=$(id); if(!b) return;
+  b.addEventListener("mousedown",(e)=>{ e.preventDefault(); fn(); });
+}
+wireFmtBtn("fb-bold",()=>execInline("bold"));
+wireFmtBtn("fb-italic",()=>execInline("italic"));
+wireFmtBtn("fb-underline",()=>execInline("underline"));
+wireFmtBtn("fb-heading",toggleHeading);
+try{ document.execCommand("styleWithCSS",false,false); }catch(e){}
 
 /* Export: erzeugt NUR die Text-PDF (mit rotem Moodle-Hinweis); die Tracking-Daten stecken
    verschlüsselt als %TRACKDATA in der PDF und sind über „Lehrkraft → PDF laden + Code" auslesbar */
 $("export-btn").addEventListener("click",async()=>{
-  const btn=$("export-btn"); const text=ed.value;
+  const btn=$("export-btn"); const ser=serializeEditor(); const text=ser.text; const fmt=ser.fmt;
   const name=studentVorname+" "+studentNachname;
   btn.disabled=true; const old=btn.textContent; btn.textContent="Erzeuge PDF…";
   try{
-    const payload=buildPayload(name,text);
+    const payload=buildPayload(name,text,fmt);
     const code=_kf(studentVorname);
     const bundle=await aesEncrypt(JSON.stringify(payload),code);
 
     const pdfName=fileSafe("Text von "+studentVorname)+".pdf";
 
-    // PDF: nur Text + roter Moodle-Hinweis; Tracking-Daten stecken (verschlüsselt) als %TRACKDATA-Reserve drin
-    const pdfStr=buildPdf({name,body:text,trackB64:bundle});
+    // PDF: formatierter Text + roter Moodle-Hinweis; Tracking-Daten stecken (verschlüsselt) als %TRACKDATA drin
+    const pdfStr=buildPdf({name,text,fmt,trackB64:bundle});
     const u8=new Uint8Array(pdfStr.length);
     for(let i=0;i<pdfStr.length;i++)u8[i]=pdfStr.charCodeAt(i)&0xFF;
 
