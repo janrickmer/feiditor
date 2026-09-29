@@ -371,7 +371,10 @@
   </div>
 </section>
 
-<div id="pagefoot" class="copyright">Copyright Jan-Rickmer Feindt · <a href="#" id="foot-teacher">Zugang für die Lehrkraft</a></div>
+<!-- Die Auswertung für Lehrkräfte läuft über „Check des Feind(t)es“ (check.janrickmer.de); im normalen Feiditor gibt es
+     deshalb keinen Lehrkraft-Zugang mehr. Das leere, verborgene Element bleibt stehen, weil die gemeinsame Feiditor-Engine
+     (identisch mit Lerntagebuch und Escape-Rooms) es beim Laden anspricht. -->
+<div id="pagefoot" class="copyright">Copyright Jan-Rickmer Feindt<a href="#" id="foot-teacher" hidden aria-hidden="true" tabindex="-1"></a></div>
 
 <!-- Optionale Konfiguration (z. B. Lerntagebuch-Feiditor): ein eigenes Skript vor der Engine kann window.FEIDITOR_CONFIG={prefill:[…],prefillLabels:false,showEscapeUpload:false,openLabel:"…",pdfName:function(vorname,nachname){…}} setzen -->
 <script>
