@@ -555,6 +555,22 @@ function fmtDateTime(d){
   return date+', '+time+' Uhr';
 }
 
+/* Überblicksseiten einer hochgeladenen PDF: alle Seiten der Überblick-PDF aus dem Escape-Room bzw. die mit OVERVIEW_MARK
+   markierten Seiten einer Feiditor-PDF. Beide Dateien stammen aus den eigenen PDF-Writern (unkomprimierte Streams, nur
+   /F1 und /F2), die Content-Streams lassen sich daher unverändert in die fertige PDF übernehmen. */
+const OVERVIEW_MARK="%ESCAPE-OVERVIEW";
+function overviewStreamsFrom(str){
+  const all=/%ESCAPEDATA /.test(str)&&!/%TRACKDATA /.test(str);   // reine Überblick-PDF: jede Seite ist eine Überblicksseite
+  const out=[]; const re=/<<\s*\/Length (\d+)\s*>>\s*stream\r?\n/g; let m;
+  while((m=re.exec(str))){
+    const start=m.index+m[0].length, n=parseInt(m[1],10); if(!(n>0)) continue;
+    const body=str.substr(start,n); re.lastIndex=start+n;
+    if(body.startsWith(OVERVIEW_MARK+"\n")) out.push(body.slice(OVERVIEW_MARK.length+1).replace(/\n+$/,""));
+    else if(all) out.push(body.replace(/\n+$/,""));
+  }
+  return out;
+}
+
 /* ============================================================
    ESCAPE-ROOM-ÜBERSICHTS-SEITEN
    Jeder Escape-Room ergänzt an dieser Stelle seine eigene Funktion
@@ -596,8 +612,10 @@ function buildPdf(opts){
     pages.push({lines:pageLines});
   }
   const nPages=pages.length;
-  // Übersichts-Seiten (aus dem Escape-Room) werden hinter die Aufgaben-Seiten gehängt
-  const ovStreams=(opts.overview&&typeof buildOverviewPages==="function")?buildOverviewPages(opts.overview):[];
+  // Übersichts-Seiten (aus dem Escape-Room) werden hinter die Aufgaben-Seiten gehängt: im eingebetteten Feiditor neu
+  // erzeugt, im eigenständigen Feiditor aus der hochgeladenen Überblick- bzw. Zwischenstand-PDF übernommen
+  const ovStreams=(opts.overview&&typeof buildOverviewPages==="function")?buildOverviewPages(opts.overview)
+    :(Array.isArray(opts.overviewStreams)?opts.overviewStreams:[]);
   const nAll=nPages+ovStreams.length;
 
   const noteText="Bitte diese PDF-Datei herunterladen und bei Moodle hochladen.";
@@ -658,7 +676,7 @@ function buildPdf(opts){
   for(let k=0;k<ovStreams.length;k++){
     const i=nPages+k;
     objects[pageObjNum(i)]=`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW.toFixed(2)} ${PH.toFixed(2)}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >> >> /Contents ${contObjNum(i)} 0 R >>`;
-    objects[contObjNum(i)]={stream:ovStreams[k]+"\n"};
+    objects[contObjNum(i)]={stream:OVERVIEW_MARK+"\n"+ovStreams[k]+"\n"};   // markiert: so findet der eigenständige Feiditor die Seiten beim Fortsetzen
   }
 
   let pdf="%PDF-1.7\n%\u00E2\u00E3\u00CF\u00D3\n";
@@ -888,6 +906,7 @@ function setLink(el,blob,filename){
 let studentVorname="", studentNachname="";
 let escapeRed=[];     // Texte der roten Felder im Escape-Room-Modus
 let escapeCtx=null;   // Steckbrief des Escape-Rooms (Fach, Jahrgangsstufe, Thema, erarbeitete Inhalte) für die KI-Bewertung
+let escapeOverviewStreams=[];   // Überblicksseiten (Content-Streams) aus einer hochgeladenen Überblick- oder Zwischenstand-PDF
 let escapeMode=false; // true: aus einem Escape-Room gestartet (Autostart oder Überblick-PDF)
 let prefilled=false;  // true: Aufgaben wurden vorbefüllt (Escape-Room, Lerntagebuch)
 
@@ -902,7 +921,7 @@ function renderMoodleHints(){
 function hideDlPanel(){ const dp=$("dl-panel"); if(dp) dp.classList.add("hidden"); }
 function makePdfName(){
   if(typeof CFG.pdfName==="function") return CFG.pdfName(studentVorname,studentNachname);
-  if(escapeMode) return fileSafe("Escape Room Daten von "+studentVorname+" "+studentNachname)+".pdf";
+  if(escapeMode) return fileSafe("Abgeschlossener Escape-Room von "+studentVorname+" "+studentNachname)+".pdf";
   return fileSafe("Text von "+studentVorname)+".pdf";
 }
 /* Zwischenstand: „Zwischenstand vom TT.MM.JJJJ um hh.mm von Vorname Nachname.pdf" (Doppelpunkt ist in Dateinamen nicht erlaubt) */
@@ -1394,7 +1413,7 @@ $("start-btn").addEventListener("click",()=>{
   if(!v||!n){$("start-err").textContent="Bitte Vor- und Nachnamen eintragen.";return;}
   studentVorname=v; studentNachname=n;
   $("who-name").textContent=v+" "+n;
-  escapeMode=false; escapeRed=[]; escapeCtx=null; renderMoodleHints();          // normaler Modus: keine roten Felder
+  escapeMode=false; escapeRed=[]; escapeCtx=null; escapeOverviewStreams=[]; renderMoodleHints();          // normaler Modus: keine roten Felder
   const tasks=Array.isArray(CFG.prefill)?CFG.prefill:[];
   prefilled=tasks.length>0;
   fillEditor(tasks, CFG.prefillLabels?(i=>"Aufgabe "+(i+1)):null);
@@ -1439,6 +1458,7 @@ async function readResumePdf(file){
     const mm=str.match(TRACK_RE);
     if(!mm){ $("resume-err").textContent="In dieser PDF wurden keine Feiditor-Daten gefunden. Bitte lade eine Zwischenstand-PDF aus dem Feiditor hoch."; return; }
     const {payload}=await autoDecrypt(mm[1]);
+    escapeOverviewStreams=(payload&&payload.e&&payload.e.esc)?overviewStreamsFrom(str):[];
     resumeFromPayload(payload);
   }catch(err){ $("resume-err").textContent="Der Zwischenstand konnte nicht gelesen werden: "+(err.message||"unbekannter Fehler"); }
 }
@@ -1481,6 +1501,7 @@ function readEscapePdf(file){
     let d;
     try{ d=JSON.parse(decodeURIComponent(escape(atob(mm[1])))); }
     catch(e){ $("esc-err").textContent="Die Escape-Room-Daten konnten nicht gelesen werden."; return; }
+    escapeOverviewStreams=overviewStreamsFrom(str);   // Überblicksseiten für die fertige PDF
     startEscapeMode(d.v,d.n,d.t,d.r,d.c);
   };
   fr.onerror=()=>{$("esc-err").textContent="Datei konnte nicht gelesen werden.";};
@@ -1586,7 +1607,7 @@ async function exportPdf(interim){
     // PDF: formatierter Text (Aufgaben fett) + roter Moodle-Hinweis; im Escape-Room zusätzlich die Übersichts-Seiten;
     // Tracking-Daten stecken (verschlüsselt) als %TRACKDATA drin
     const overview=(window.__ESCAPE_DATA__&&window.__ESCAPE_DATA__.overview)||null;
-    const pdfStr=buildPdf({name,text,fmt,trackB64:bundle,overview});
+    const pdfStr=buildPdf({name,text,fmt,trackB64:bundle,overview,overviewStreams:escapeOverviewStreams});
     const u8=new Uint8Array(pdfStr.length);
     for(let i=0;i<pdfStr.length;i++)u8[i]=pdfStr.charCodeAt(i)&0xFF;
     // octet-stream im Escape-Room-Modus: erzwingt Speichern statt Anzeigen

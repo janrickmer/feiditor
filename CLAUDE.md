@@ -10,4 +10,10 @@
 - **Nutzdaten** (`%TRACKDATA`, AES-GCM): `t`, `m`, `f`, `k`, `v: 2` (Längen in UTF-16-Einheiten), `z` (1 =
   Zwischenstand, 0 = fertige Abgabe); im Escape-Modus `e = {esc, red, ctx}` – `ctx` ist der Steckbrief des
   Escape-Rooms (Jahrgangsstufe, Inhalte) aus `window.__ESCAPE_DATA__.ctx` bzw. `%ESCAPEDATA` (Feld `c`).
+- **Eine Datei für Moodle:** Die fertige Abgabe im Escape-Modus heißt „Abgeschlossener Escape-Room von Vorname
+  Nachname.pdf“ (`makePdfName()`) und enthält vorne Aufgaben und Antworten, hinten die Überblicksseiten des
+  Escape-Rooms. Der eingebettete Feiditor erzeugt sie aus `window.__ESCAPE_DATA__.overview` (`buildOverviewPages`);
+  der eigenständige Feiditor übernimmt sie aus der hochgeladenen Überblick-PDF bzw. Zwischenstand-PDF
+  (`overviewStreamsFrom()`: alle Seiten der Überblick-PDF, in Feiditor-PDFs die mit `%ESCAPE-OVERVIEW` markierten
+  Content-Streams) und hängt sie unverändert an (`buildPdf`, `opts.overviewStreams`).
 - **Live für Schüler:innen** (Branch `main`): vor jedem Push mit echten Dateien im Check testen.
