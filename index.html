@@ -561,12 +561,14 @@ function fmtDateTime(d){
 const OVERVIEW_MARK="%ESCAPE-OVERVIEW";
 function overviewStreamsFrom(str){
   const all=/%ESCAPEDATA /.test(str)&&!/%TRACKDATA /.test(str);   // reine Überblick-PDF: jede Seite ist eine Überblicksseite
+  // Feiditor-PDFs vor dem 04.10.2026 tragen keine Markierung: dort zählt eine Seite, deren erster Text ein Überblick-Titel ist
+  const TITLE=/\((?:\xDCberblick deiner Antworten & Erl\xE4uterungen|L\xF6sungserl\xE4uterungen)\) Tj/;
   const out=[]; const re=/<<\s*\/Length (\d+)\s*>>\s*stream\r?\n/g; let m;
   while((m=re.exec(str))){
     const start=m.index+m[0].length, n=parseInt(m[1],10); if(!(n>0)) continue;
     const body=str.substr(start,n); re.lastIndex=start+n;
     if(body.startsWith(OVERVIEW_MARK+"\n")) out.push(body.slice(OVERVIEW_MARK.length+1).replace(/\n+$/,""));
-    else if(all) out.push(body.replace(/\n+$/,""));
+    else if(all||TITLE.test(body.slice(0,400))) out.push(body.replace(/\n+$/,""));
   }
   return out;
 }
