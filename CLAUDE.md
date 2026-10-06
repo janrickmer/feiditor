@@ -1,9 +1,10 @@
 # Feiditor – Hinweise für die Entwicklung
 
-- **Eine Engine für elf Feiditoren:** Das große Skript („EINE Engine für alle Feiditoren“) ist byte-identisch im
-  normalen Feiditor (janrickmer/feiditor), im Lerntagebuch-Feiditor (janrickmer/lerntagebuch-feiditor) und in
-  den in die neun Escape-Rooms eingebetteten Feiditoren (janrickmer/escape-room-*). Änderungen als exakte
-  Ersetzungen in alle elf Dateien einspielen und prüfen. Unterschiede nur über `window.FEIDITOR_CONFIG` (vor
+- **Eine Engine für dreizehn Feiditoren:** Das große Skript („EINE Engine für alle Feiditoren“) ist byte-identisch
+  im normalen Feiditor (janrickmer/feiditor), im Lerntagebuch-Feiditor (janrickmer/lerntagebuch-feiditor) und in
+  den in die elf Escape-Rooms eingebetteten Feiditoren (janrickmer/escape-room-* sowie janrickmer/BSO-JG11 und
+  janrickmer/Q3-PoWi-Konfliktanalyse-im-H-rtetest). Änderungen als exakte Ersetzungen in alle dreizehn Dateien
+  einspielen und prüfen. Unterschiede nur über `window.FEIDITOR_CONFIG` (vor
   der Engine) oder eigene Skripte danach.
 - **Auswertung für Lehrkräfte:** ausschließlich „Check des Feind(t)es“ (check.janrickmer.de, Repository
   janrickmer/check-des-feind-t-es mit ausführlicher `CLAUDE.md`). Im Feiditor gibt es keinen Lehrkraft-Zugang.
